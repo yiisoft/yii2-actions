@@ -113,7 +113,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup PHP Environment.
-        uses: yiisoft/yii2-actions/actions/php-setup@main
+        uses: yiisoft/yii2-actions/actions/php-setup@master
         with:
           auth-token: ${{ secrets.AUTH_TOKEN }}
           composer-command: ${{ inputs.composer-command }}
