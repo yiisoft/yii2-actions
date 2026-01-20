@@ -1,0 +1,109 @@
+---
+name: PHP setup with composer.
+description: Setup PHP environment with composer and install dependencies.
+
+inputs:
+  auth-token:
+    description: GitHub token.
+    default:
+    required: false
+    type: string
+  composer-command:
+    description: Composer command (install or update) to run.
+    default: update
+    required: false
+    type: string
+  composer-flags:
+    description: Additional composer flags
+    default: >-
+      --prefer-dist
+      --no-interaction
+      --no-progress
+      --optimize-autoloader
+      --ansi
+    required: false
+    type: string
+  composer-version:
+    description: Composer version to use.
+    default:
+    required: false
+    type: string
+  coverage-driver:
+    description: Code coverage driver to use (pcov, xdebug).
+    default: pcov
+    required: false
+    type: string
+  extensions:
+    description: List of extensions to PHP.
+    default:
+    required: false
+    type: string
+  ignore-platform-reqs:
+    description: Whether to add --ignore-platform-reqs to composer command.
+    default: false
+    required: false
+    type: boolean
+  ini-values:
+    description: Initial values for PHP configuration.
+    default: date.timezone='UTC'
+    required: false
+    type: string
+  php-version:
+    description: PHP version to install (for example, "8.4").
+    default: "8.4"
+    required: false
+    type: string
+  tools:
+    description: Tools to test, separated by comma.
+    default:
+    required: false
+    type: string
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Install PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        coverage: ${{ inputs.coverage-driver }}
+        extensions: ${{ inputs.extensions }}
+        ini-values: ${{ inputs.ini-values }}
+        php-version: ${{ inputs.php-version }}
+        tools: ${{ inputs.tools }}
+
+    - name: Update composer.
+      shell: bash
+      run: composer self-update ${{ inputs.composer-version }}
+
+    - name: Configure composer on linux.
+      shell: bash
+      if: runner.os == 'Linux'
+      run: |
+        if [ "${{ inputs.auth-token }}" != '' ]; then
+          composer config -g github-oauth.github.com ${{ inputs.auth-token }};
+        fi
+
+    - name: Configure composer on windows.
+      shell: pwsh
+      if: runner.os == 'Windows'
+      run: |
+        if ($env:AUTH_TOKEN -ne '') {
+          composer config -g github-oauth.github.com $env:AUTH_TOKEN
+        }
+      env:
+        AUTH_TOKEN: ${{ inputs.auth-token }}
+
+    - name: Install dependencies with composer.
+      shell: bash
+      run: >-
+        composer
+        ${{ inputs.composer-command }}
+        ${{ inputs.composer-flags }}
+        ${{
+          inputs.ignore-platform-reqs == 'true'
+          && '--ignore-platform-reqs'
+          || ''
+        }}

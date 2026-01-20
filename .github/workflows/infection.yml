@@ -1,0 +1,198 @@
+---
+name: infection
+
+on:
+  workflow_call:
+    inputs:
+      before-hook:
+        description: Before hook to run.
+        default:
+        required: false
+        type: string
+      command:
+        description: Command to run.
+        default: infection
+        required: false
+        type: string
+      command-coverage-options:
+        description: Options for the infection tool when generating coverage.
+        default:
+        required: false
+        type: string
+      command-options:
+        description: Options for the infection tool.
+        default: --threads=2 --ignore-msi-with-no-mutations
+        required: false
+        type: string
+      composer-command:
+        description: Composer command (install or update) to run.
+        default: update
+        required: false
+        type: string
+      composer-flags:
+        description: Additional composer flags
+        default: >-
+          --prefer-dist
+          --no-interaction
+          --no-progress
+          --optimize-autoloader
+          --ansi
+        required: false
+        type: string
+      composer-version:
+        description: Composer version to use.
+        default:
+        required: false
+        type: string
+      concurrency-group:
+        description: Concurrency group name.
+        default: infection/${{ github.workflow }}-${{ github.ref }}
+        required: false
+        type: string
+      coverage-driver:
+        description: Code coverage driver to use (pcov, xdebug).
+        default: pcov
+        required: false
+        type: string
+      enable-concurrency:
+        description: Enable concurrency.
+        default: true
+        required: false
+        type: boolean
+      debug:
+        description: Debug mode.
+        default: false
+        required: false
+        type: boolean
+      extensions:
+        description: List of extensions to PHP.
+        default:
+        required: false
+        type: string
+      framework-options:
+        description: Options for the framework.
+        default:
+        required: false
+        type: string
+      ignore-platform-reqs:
+        description: Whether to add --ignore-platform-reqs to composer command.
+        default: false
+        required: false
+        type: boolean
+      os:
+        description: OS runner as a JSON array string '["ubuntu-latest"]'.
+        default: '["ubuntu-latest"]'
+        required: false
+        type: string
+      php-ini-values:
+        description: Initial values for PHP configuration.
+        default: date.timezone='UTC'
+        required: false
+        type: string
+      php-version:
+        description: PHP versions as a JSON array string '["8.5"]'.
+        default: '["8.5"]'
+        required: false
+        type: string
+      phpstan:
+        description: Run PHPStan and use it with Infection.
+        default: false
+        required: false
+        type: boolean
+      phpstan-configuration:
+        description: PHPStan configuration file.
+        default: phpstan.neon
+        required: false
+        type: string
+      tools:
+        description: Tools to test, separated by comma.
+        default:
+        required: false
+        type: string
+    secrets:
+      AUTH_TOKEN:
+        description: GitHub token.
+        required: false
+      STRYKER_DASHBOARD_API_KEY:
+        required: true
+
+jobs:
+  infection:
+    concurrency:
+      cancel-in-progress: ${{ inputs.enable-concurrency }}
+      group: ${{ inputs.concurrency-group }}
+
+    name: PHP ${{ matrix.php-version }}-${{ matrix.os }}
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(inputs.os) }}
+        php-version: ${{ fromJson(inputs.php-version) }}
+
+    steps:
+      - name: Monitor action permissions.
+        if: runner.os != 'Windows'
+        uses: GitHubSecurityLab/actions-permissions/monitor@v1
+
+      - name: Checkout.
+        uses: actions/checkout@v6
+
+      - name: Setup PHP Environment.
+        uses:  yiisoft/yii2-actions/actions/php-setup@main
+        with:
+          auth-token: ${{ secrets.AUTH_TOKEN }}
+          composer-command: ${{ inputs.composer-command }}
+          composer-flags: ${{ inputs.composer-flags }}
+          composer-version: ${{ inputs.composer-version }}
+          coverage-driver: ${{ inputs.coverage-driver }}
+          extensions: ${{ inputs.extensions }}
+          ignore-platform-reqs: ${{ inputs.ignore-platform-reqs }}
+          ini-values: ${{ inputs.php-ini-values }}
+          php-version: ${{ matrix.php-version }}
+          tools: ${{ inputs.tools }}
+
+      - name: Run before hook.
+        if: inputs.before-hook != ''
+        run: ${{ inputs.before-hook }}
+
+      - name: Cache PHPStan results.
+        if: ${{ inputs.phpstan }}
+        uses: actions/cache@v5
+        with:
+          path: .phpstan/cache
+          key: phpstan-${{ runner.os }}-${{ hashFiles('phpstan.neon*') }}
+          restore-keys: |
+            phpstan-${{ runner.os }}-
+
+      - name: Run PHPStan (build cache).
+        if: ${{ inputs.phpstan }}
+        shell: bash
+        run: >-
+          vendor/bin/phpstan
+          --configuration="${{ inputs.phpstan-configuration }}"
+          analyse
+
+      - name: Run infection.
+        shell: bash
+        run: >-
+          vendor/bin/${{ inputs.command }}
+          ${{ inputs.command-options }}
+          ${{ inputs.phpstan && '--static-analysis-tool=phpstan' || '' }}
+          ${{ inputs.command-coverage-options }}
+          ${{ inputs.framework-options }}
+        env:
+          STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}
+
+      - name: Archive infection results.
+        if: ${{ inputs.debug }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: infection-${{ matrix.php-version }}-${{ matrix.os }}
+          path: ./infection.log
+
+      - name: Download all workflow run artifacts.
+        if: ${{ inputs.debug }}
+        uses: actions/download-artifact@v7

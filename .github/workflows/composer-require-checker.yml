@@ -1,0 +1,117 @@
+---
+name: composer-require-checker
+
+on:
+  workflow_call:
+    inputs:
+      command-options:
+        description: Options for the Composer Require Checker tool.
+        default:
+        required: false
+        type: string
+      composer-command:
+        description: Composer command (install or update) to run.
+        default: update
+        required: false
+        type: string
+      composer-flags:
+        description: Additional composer flags
+        default: >-
+          --prefer-dist
+          --no-interaction
+          --no-progress
+          --optimize-autoloader
+          --ansi
+        required: false
+        type: string
+      composer-version:
+        description: Composer version to use.
+        default:
+        required: false
+        type: string
+      concurrency-group:
+        description: Concurrency group name.
+        default: ${{ github.workflow }}-${{ github.ref }}
+        required: false
+        type: string
+      enable-concurrency:
+        description: Enable concurrency.
+        default: true
+        required: false
+        type: boolean
+      extensions:
+        description: List of extensions to PHP.
+        default:
+        required: false
+        type: string
+      ignore-platform-reqs:
+        description: Whether to add --ignore-platform-reqs to composer command.
+        default: false
+        required: false
+        type: boolean
+      os:
+        description: OS runner as a JSON array string '["ubuntu-latest"]'.
+        default: '["ubuntu-latest"]'
+        required: false
+        type: string
+      php-ini-values:
+        description: Initial values for PHP configuration.
+        default: date.timezone='UTC'
+        required: false
+        type: string
+      php-version:
+        description: PHP versions as a JSON array string '["8.5"]'.
+        default: '["8.5"]'
+        required: false
+        type: string
+      tools:
+        description: Tools to test, separated by comma.
+        default:
+        required: false
+        type: string
+
+    secrets:
+      AUTH_TOKEN:
+        description: GitHub token.
+        required: false
+
+jobs:
+  composer-require-checker:
+    name: PHP ${{ matrix.php-version }}-${{ matrix.os }}
+
+    concurrency:
+      group: ${{ matrix.os }}-${{ matrix.php-version }}-${{ inputs.concurrency-group }}
+      cancel-in-progress: ${{ inputs.enable-concurrency }}
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(inputs.os) }}
+        php-version: ${{ fromJson(inputs.php-version) }}
+
+    steps:
+      - name: Monitor action permissions.
+        if: runner.os != 'Windows'
+        uses: GitHubSecurityLab/actions-permissions/monitor@v1
+
+      - name: Checkout.
+        uses: actions/checkout@v6
+
+      - name: Setup PHP Environment.
+        uses:  yiisoft/yii2-actions/actions/php-setup@main
+        with:
+          auth-token: ${{ secrets.AUTH_TOKEN }}
+          composer-command: ${{ inputs.composer-command }}
+          composer-flags: ${{ inputs.composer-flags }}
+          composer-version: ${{ inputs.composer-version }}
+          coverage-driver: none
+          extensions: ${{ inputs.extensions }}
+          ignore-platform-reqs: ${{ inputs.ignore-platform-reqs }}
+          ini-values: ${{ inputs.php-ini-values }}
+          php-version: ${{ matrix.php-version }}
+          tools: ${{ inputs.tools }}
+
+      - name: Check composer requirements.
+        run: vendor/bin/composer-require-checker ${{ inputs.command-options }}

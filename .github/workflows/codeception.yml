@@ -1,0 +1,157 @@
+---
+name: build
+
+on:
+  workflow_call:
+    inputs:
+      codeception-command:
+        description: Codeception command to run.
+        default: vendor/bin/codecept run --coverage-xml
+        required: false
+        type: string
+      composer-command:
+        description: Composer command (install or update) to run.
+        default: update
+        required: false
+        type: string
+      composer-flags:
+        description: Additional composer flags
+        default: >-
+          --prefer-dist
+          --no-interaction
+          --no-progress
+          --optimize-autoloader
+          --ansi
+        required: false
+        type: string
+      composer-version:
+        description: Composer version to use.
+        default:
+        required: false
+        type: string
+      coverage-driver:
+        description: Code coverage driver to use (pcov, xdebug).
+        default: pcov
+        required: false
+        type: string
+      coverage-file:
+        description: Coverage output file name.
+        default: tests/_output/coverage.xml
+        required: false
+        type: string
+      debug:
+        description: Debug mode.
+        default: false
+        required: false
+        type: boolean
+      extensions:
+        description: List of extensions to PHP.
+        default:
+        required: false
+        type: string
+      hook:
+        description: Hook to run.
+        default:
+        required: false
+        type: string
+      ignore-platform-reqs:
+        description: Whether to add --ignore-platform-reqs to composer command.
+        default: false
+        required: false
+        type: boolean
+      os:
+        description: OS runner as a JSON array string '["ubuntu-latest"]'.
+        default: '["ubuntu-latest","windows-2022"]'
+        required: false
+        type: string
+      php-ini-values:
+        description: Initial values for PHP configuration.
+        default: date.timezone='UTC'
+        required: false
+        type: string
+      php-version:
+        description: PHP versions as a JSON array string '["8.5"]'.
+        default: '["7.4","8.0","8.1","8.2","8.3","8.4","8.5"]'
+        required: false
+        type: string
+      tools:
+        description: Tools to test, separated by comma.
+        default: composer:v2
+        required: false
+        type: string
+
+    secrets:
+      AUTH_TOKEN:
+        description: GitHub token.
+        required: false
+      CODECOV_TOKEN:
+        description: Codecov token.
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeception:
+    name: PHP ${{ matrix.php-version }}-${{ matrix.os }}
+
+    env:
+      key: cache-v1
+      YII_C3: true
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(inputs.os) }}
+        php-version: ${{ fromJson(inputs.php-version) }}
+
+    steps:
+      - name: Checkout.
+        uses: actions/checkout@v6
+
+      - name: Setup PHP Environment.
+        uses: yiisoft/yii2-actions/actions/php-setup@main
+        with:
+          auth-token: ${{ secrets.AUTH_TOKEN }}
+          composer-command: ${{ inputs.composer-command }}
+          composer-flags: ${{ inputs.composer-flags }}
+          composer-version: ${{ inputs.composer-version }}
+          coverage-driver: ${{ inputs.coverage-driver }}
+          extensions: ${{ inputs.extensions }}
+          ignore-platform-reqs: ${{ inputs.ignore-platform-reqs }}
+          ini-values: ${{ inputs.php-ini-values }}
+          php-version: ${{ matrix.php-version }}
+          tools: ${{ inputs.tools }}
+
+      - name: Run hook.
+        if: inputs.hook != ''
+        run: ${{ inputs.hook }}
+        shell: bash
+
+      - name: Generate base classes for all suites.
+        run: vendor/bin/codecept build
+
+      - name: Run tests with codeception with code coverage.
+        continue-on-error: ${{ inputs.debug }}
+        run: ${{ inputs.codeception-command }}
+
+      - name: Upload coverage to Codecov.
+        if: ${{!cancelled() && inputs.coverage-driver != 'none'}}
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./${{ inputs.coverage-file }}
+
+      - name: Archive codeception results
+        if: ${{ inputs.debug }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: output
+          path: ./runtime/tests/_output
+
+      - name: Download all workflow run artifacts
+        if: ${{ inputs.debug }}
+        uses: actions/download-artifact@v7
