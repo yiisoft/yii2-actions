@@ -29,6 +29,11 @@ on:
         default:
         required: false
         type: string
+      concurrency-group:
+        description: Concurrency group name.
+        default: ${{ github.workflow }}-${{ github.ref }}
+        required: false
+        type: string        
       coverage-driver:
         description: Code coverage driver to use (pcov, xdebug).
         default: pcov
@@ -44,6 +49,11 @@ on:
         default: false
         required: false
         type: boolean
+      enable-concurrency:
+        description: Enable concurrency.
+        default: true
+        required: false
+        type: boolean        
       extensions:
         description: List of extensions to PHP.
         default:
@@ -88,13 +98,13 @@ on:
         description: Codecov token.
         required: false
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   codeception:
     name: PHP ${{ matrix.php-version }}-${{ matrix.os }}
+
+    concurrency:
+      group: ${{ matrix.os }}-${{ matrix.php-version }}-${{ inputs.concurrency-group }}
+      cancel-in-progress: ${{ inputs.enable-concurrency }}
 
     env:
       key: cache-v1
