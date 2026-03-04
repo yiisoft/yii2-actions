@@ -35,7 +35,7 @@ on:
         type: string
       directories:
         description: Space-separated directories or paths to lint (for example, 'src/ tests/').
-        default: framework/ tests/ build/
+        default:
         required: false
         type: string        
       enable-concurrency:
