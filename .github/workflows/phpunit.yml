@@ -1,3 +1,6 @@
+permissions:
+  contents: read
+
 name: phpunit
 
 on:
@@ -125,6 +128,9 @@ on:
 jobs:
   phpunit:
     name: PHP ${{ matrix.php-version }}-${{ matrix.os }}
+    permissions:
+      contents: read
+      pull-requests: write
 
     concurrency:
       group: ${{ matrix.os }}-${{ matrix.php-version }}-${{ inputs.concurrency-group }}
@@ -141,13 +147,15 @@ jobs:
     steps:
       - name: Monitor action permissions.
         if: runner.os != 'Windows'
-        uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        uses: GitHubSecurityLab/actions-permissions/monitor@bf82d13b9b10051d224345ab9184f5ede0a94289
 
       - name: Checkout.
-        uses: actions/checkout@v7
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
 
       - name: Setup PHP Environment.
-        uses: yiisoft/yii2-actions/actions/php-setup@master
+        uses: yiisoft/yii2-actions/actions/php-setup@161a59a5e7d9c5b650c4a132f6e9292bacfcb5cc
         with:
           auth-token: ${{ secrets.AUTH_TOKEN }}
           composer-command: ${{ inputs.composer-command }}
@@ -162,11 +170,13 @@ jobs:
 
       - name: Run hook.
         if: inputs.hook != ''
-        run: ${{ inputs.hook }}
+        run: ${INPUTS_HOOK}
         shell: bash
+        env:
+          INPUTS_HOOK: ${{ inputs.hook }}
 
       - name: Run PHPUnit tests with coverage.
-        uses: yiisoft/yii2-actions/actions/phpunit@master
+        uses: yiisoft/yii2-actions/actions/phpunit@161a59a5e7d9c5b650c4a132f6e9292bacfcb5cc
         with:
           configuration: ${{ inputs.phpunit-configuration }}
           coverage-driver: ${{ inputs.coverage-driver }}

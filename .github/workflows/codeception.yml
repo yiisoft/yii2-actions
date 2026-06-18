@@ -1,3 +1,6 @@
+permissions:
+  contents: read
+
 name: build
 
 on:
@@ -119,10 +122,12 @@ jobs:
 
     steps:
       - name: Checkout.
-        uses: actions/checkout@v7
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
 
       - name: Setup PHP Environment.
-        uses: yiisoft/yii2-actions/actions/php-setup@master
+        uses: yiisoft/yii2-actions/actions/php-setup@161a59a5e7d9c5b650c4a132f6e9292bacfcb5cc
         with:
           auth-token: ${{ secrets.AUTH_TOKEN }}
           composer-command: ${{ inputs.composer-command }}
@@ -137,30 +142,34 @@ jobs:
 
       - name: Run hook.
         if: inputs.hook != ''
-        run: ${{ inputs.hook }}
+        run: ${INPUTS_HOOK}
         shell: bash
+        env:
+          INPUTS_HOOK: ${{ inputs.hook }}
 
       - name: Generate base classes for all suites.
         run: vendor/bin/codecept build
 
       - name: Run tests with codeception with code coverage.
         continue-on-error: ${{ inputs.debug }}
-        run: ${{ inputs.codeception-command }}
+        run: ${INPUTS_CODECEPTION_COMMAND}
+        env:
+          INPUTS_CODECEPTION_COMMAND: ${{ inputs.codeception-command }}
 
       - name: Upload coverage to Codecov.
         if: ${{!cancelled() && inputs.coverage-driver != 'none'}}
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./${{ inputs.coverage-file }}
 
       - name: Archive codeception results
         if: ${{ inputs.debug }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: output
           path: ./runtime/tests/_output
 
       - name: Download all workflow run artifacts
         if: ${{ inputs.debug }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
