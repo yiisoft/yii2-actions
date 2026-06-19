@@ -1,23 +1,19 @@
 name: zizmor 🌈
 
 on:
+  pull_request:
+    paths: &security-paths
+      - .github/**.yml
+      - .github/**.yaml
+      - actions/**.yml
+      - actions/**.yaml
   push:
     branches:
       - master
-    paths:
-      - .github/**.yml
-      - .github/**.yaml
-      - actions/**.yml
-      - actions/**.yaml
-  pull_request:
-    paths:
-      - .github/**.yml
-      - .github/**.yaml
-      - actions/**.yml
-      - actions/**.yaml
+    paths: *security-paths
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: security-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
