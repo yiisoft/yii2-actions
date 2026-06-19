@@ -1,4 +1,4 @@
-name: GitHub Actions Security Analysis.
+name: Reusable zizmor security audit
 
 on:
   workflow_call:
@@ -13,6 +13,11 @@ on:
         default: true
         required: false
         type: boolean
+      audit-inputs:
+        description: Paths or workflow/action inputs passed to zizmor.
+        default: .github actions
+        required: false
+        type: string
       persona:
         description: zizmor persona to use while auditing.
         default: pedantic
@@ -24,7 +29,7 @@ permissions:
 
 jobs:
   zizmor:
-    name: Run zizmor 🌈.
+    name: Audit GitHub Actions workflows.
     runs-on: ubuntu-latest
 
     steps:
@@ -33,9 +38,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run zizmor 🌈.
+      - name: Run zizmor security audit.
         uses: zizmorcore/zizmor-action@5f14fd08f7cf1cb1609c1e344975f152c7ee938d # v0.5.6
         with:
           advanced-security: ${{ inputs.advanced-security }}
           annotations: ${{ inputs.annotations }}
+          inputs: ${{ inputs.audit-inputs }}
           persona: ${{ inputs.persona }}
