@@ -61,11 +61,14 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Checkout
-      uses: actions/checkout@v5
+    - name: Checkout.
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      with:
+        clean: false
+        persist-credentials: false
 
-    - name: Install PHP
-      uses: shivammathur/setup-php@v2
+    - name: Install PHP.
+      uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
       with:
         coverage: ${{ inputs.coverage-driver }}
         extensions: ${{ inputs.extensions }}
@@ -75,34 +78,55 @@ runs:
 
     - name: Update composer.
       shell: bash
-      run: composer self-update ${{ inputs.composer-version }}
+      env:
+        COMPOSER_VERSION: ${{ inputs.composer-version }}
+      run: |
+        if [ -n "$COMPOSER_VERSION" ]; then
+          composer self-update "$COMPOSER_VERSION"
+        else
+          composer self-update
+        fi
 
     - name: Configure composer on linux.
       shell: bash
       if: runner.os == 'Linux'
+      env:
+        AUTH_TOKEN: ${{ inputs.auth-token }}
       run: |
-        if [ "${{ inputs.auth-token }}" != '' ]; then
-          composer config -g github-oauth.github.com ${{ inputs.auth-token }};
+        if [ -n "$AUTH_TOKEN" ]; then
+          composer config -g github-oauth.github.com "$AUTH_TOKEN"
         fi
 
     - name: Configure composer on windows.
       shell: pwsh
       if: runner.os == 'Windows'
+      env:
+        AUTH_TOKEN: ${{ inputs.auth-token }}
       run: |
         if ($env:AUTH_TOKEN -ne '') {
           composer config -g github-oauth.github.com $env:AUTH_TOKEN
         }
-      env:
-        AUTH_TOKEN: ${{ inputs.auth-token }}
 
     - name: Install dependencies with composer.
       shell: bash
-      run: >-
-        composer
-        ${{ inputs.composer-command }}
-        ${{ inputs.composer-flags }}
-        ${{
-          inputs.ignore-platform-reqs == 'true'
-          && '--ignore-platform-reqs'
-          || ''
-        }}
+      env:
+        COMPOSER_COMMAND: ${{ inputs.composer-command }}
+        COMPOSER_FLAGS: ${{ inputs.composer-flags }}
+        IGNORE_PLATFORM_REQS: ${{ inputs.ignore-platform-reqs }}
+      run: |
+        composer_args=()
+
+        if [ -n "$COMPOSER_COMMAND" ]; then
+          composer_args+=("$COMPOSER_COMMAND")
+        fi
+
+        if [ -n "$COMPOSER_FLAGS" ]; then
+          read -r -a composer_flags <<< "$COMPOSER_FLAGS"
+          composer_args+=("${composer_flags[@]}")
+        fi
+
+        if [ "$IGNORE_PLATFORM_REQS" = "true" ]; then
+          composer_args+=("--ignore-platform-reqs")
+        fi
+
+        composer "${composer_args[@]}"

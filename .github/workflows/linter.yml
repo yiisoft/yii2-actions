@@ -1,5 +1,8 @@
 name: linter
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:
@@ -93,13 +96,23 @@ jobs:
     steps:
       - name: Monitor action permissions.
         if: runner.os != 'Windows'
-        uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        uses: GitHubSecurityLab/actions-permissions/monitor@bf82d13b9b10051d224345ab9184f5ede0a94289 # v1
 
       - name: Checkout.
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout Yii2 Actions.
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .yii2-actions
+          persist-credentials: false
 
       - name: Setup PHP Environment.
-        uses: yiisoft/yii2-actions/actions/php-setup@master
+        uses: ./.yii2-actions/actions/php-setup
         with:
           auth-token: ${{ secrets.AUTH_TOKEN }}
           composer-command: ${{ inputs.composer-command }}
@@ -112,4 +125,15 @@ jobs:
           tools: ${{ inputs.tools }}
 
       - name: Run PHP_CodeSniffer.
-        run: vendor/bin/phpcs -q --report=checkstyle ${{ inputs.directories }} | cs2pr
+        shell: bash
+        env:
+          DIRECTORIES: ${{ inputs.directories }}
+        run: |
+          phpcs_cmd=(vendor/bin/phpcs -q --report=checkstyle)
+
+          if [ -n "$DIRECTORIES" ]; then
+            read -r -a directories <<< "$DIRECTORIES"
+            phpcs_cmd+=("${directories[@]}")
+          fi
+
+          "${phpcs_cmd[@]}" | cs2pr

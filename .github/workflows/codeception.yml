@@ -1,5 +1,8 @@
 name: build
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:
@@ -119,10 +122,20 @@ jobs:
 
     steps:
       - name: Checkout.
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout Yii2 Actions.
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .yii2-actions
+          persist-credentials: false
 
       - name: Setup PHP Environment.
-        uses: yiisoft/yii2-actions/actions/php-setup@master
+        uses: ./.yii2-actions/actions/php-setup
         with:
           auth-token: ${{ secrets.AUTH_TOKEN }}
           composer-command: ${{ inputs.composer-command }}
@@ -137,30 +150,35 @@ jobs:
 
       - name: Run hook.
         if: inputs.hook != ''
-        run: ${{ inputs.hook }}
         shell: bash
+        env:
+          HOOK: ${{ inputs.hook }}
+        run: bash -euo pipefail -c "$HOOK"
 
       - name: Generate base classes for all suites.
         run: vendor/bin/codecept build
 
       - name: Run tests with codeception with code coverage.
         continue-on-error: ${{ inputs.debug }}
-        run: ${{ inputs.codeception-command }}
+        shell: bash
+        env:
+          CODECEPTION_COMMAND: ${{ inputs.codeception-command }}
+        run: bash -euo pipefail -c "$CODECEPTION_COMMAND"
 
       - name: Upload coverage to Codecov.
         if: ${{!cancelled() && inputs.coverage-driver != 'none'}}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./${{ inputs.coverage-file }}
 
       - name: Archive codeception results
         if: ${{ inputs.debug }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: output
           path: ./runtime/tests/_output
 
       - name: Download all workflow run artifacts
         if: ${{ inputs.debug }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8

@@ -1,5 +1,8 @@
 name: infection
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:
@@ -134,13 +137,23 @@ jobs:
     steps:
       - name: Monitor action permissions.
         if: runner.os != 'Windows'
-        uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        uses: GitHubSecurityLab/actions-permissions/monitor@bf82d13b9b10051d224345ab9184f5ede0a94289 # v1
 
       - name: Checkout.
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout Yii2 Actions.
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .yii2-actions
+          persist-credentials: false
 
       - name: Setup PHP Environment.
-        uses: yiisoft/yii2-actions/actions/php-setup@master
+        uses: ./.yii2-actions/actions/php-setup
         with:
           auth-token: ${{ secrets.AUTH_TOKEN }}
           composer-command: ${{ inputs.composer-command }}
@@ -155,11 +168,14 @@ jobs:
 
       - name: Run before hook.
         if: inputs.before-hook != ''
-        run: ${{ inputs.before-hook }}
+        shell: bash
+        env:
+          BEFORE_HOOK: ${{ inputs.before-hook }}
+        run: bash -euo pipefail -c "$BEFORE_HOOK"
 
       - name: Cache PHPStan results.
         if: ${{ inputs.phpstan }}
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .phpstan/cache
           key: phpstan-${{ runner.os }}-${{ hashFiles('phpstan.neon*') }}
@@ -169,29 +185,48 @@ jobs:
       - name: Run PHPStan (build cache).
         if: ${{ inputs.phpstan }}
         shell: bash
-        run: >-
-          vendor/bin/phpstan
-          --configuration="${{ inputs.phpstan-configuration }}"
-          analyse
+        env:
+          PHPSTAN_CONFIGURATION: ${{ inputs.phpstan-configuration }}
+        run: vendor/bin/phpstan --configuration="$PHPSTAN_CONFIGURATION" analyse
 
       - name: Run infection.
         shell: bash
-        run: >-
-          vendor/bin/${{ inputs.command }}
-          ${{ inputs.command-options }}
-          ${{ inputs.phpstan && '--static-analysis-tool=phpstan' || '' }}
-          ${{ inputs.command-coverage-options }}
-          ${{ inputs.framework-options }}
         env:
+          COMMAND: ${{ inputs.command }}
+          COMMAND_OPTIONS: ${{ inputs.command-options }}
+          COMMAND_COVERAGE_OPTIONS: ${{ inputs.command-coverage-options }}
+          FRAMEWORK_OPTIONS: ${{ inputs.framework-options }}
+          PHPSTAN: ${{ inputs.phpstan }}
           STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}
+        run: |
+          infection_cmd=("vendor/bin/$COMMAND")
+
+          add_words() {
+            if [ -n "$1" ]; then
+              local -a words
+              read -r -a words <<< "$1"
+              infection_cmd+=("${words[@]}")
+            fi
+          }
+
+          add_words "$COMMAND_OPTIONS"
+
+          if [ "$PHPSTAN" = "true" ]; then
+            infection_cmd+=("--static-analysis-tool=phpstan")
+          fi
+
+          add_words "$COMMAND_COVERAGE_OPTIONS"
+          add_words "$FRAMEWORK_OPTIONS"
+
+          "${infection_cmd[@]}"
 
       - name: Archive infection results.
         if: ${{ inputs.debug }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: infection-${{ matrix.php-version }}-${{ matrix.os }}
           path: ./infection.log
 
       - name: Download all workflow run artifacts.
         if: ${{ inputs.debug }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
