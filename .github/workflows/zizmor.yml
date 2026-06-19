@@ -28,8 +28,8 @@ permissions:
   contents: read
 
 jobs:
-  zizmor:
-    name: Audit GitHub Actions workflows.
+  actions:
+    name: Actions
     runs-on: ubuntu-latest
 
     steps:

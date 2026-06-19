@@ -1,4 +1,4 @@
-name: GitHub Actions Security Analysis with zizmor 🌈
+name: zizmor 🌈
 
 on:
   push:
@@ -24,8 +24,8 @@ permissions:
   contents: read
 
 jobs:
-  zizmor:
-    name: Run zizmor 🌈
+  analyze:
+    name: Analyze
     permissions:
       contents: read
     uses: ./.github/workflows/zizmor.yml
