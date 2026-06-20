@@ -155,7 +155,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup PHP Environment.
-        uses: yiisoft/yii2-actions/actions/php-setup@161a59a5e7d9c5b650c4a132f6e9292bacfcb5cc
+        uses: yiisoft/yii2-actions/actions/php-setup@master
         with:
           auth-token: ${{ secrets.AUTH_TOKEN }}
           composer-command: ${{ inputs.composer-command }}
@@ -176,7 +176,7 @@ jobs:
           INPUTS_HOOK: ${{ inputs.hook }}
 
       - name: Run PHPUnit tests with coverage.
-        uses: yiisoft/yii2-actions/actions/phpunit@161a59a5e7d9c5b650c4a132f6e9292bacfcb5cc
+        uses: yiisoft/yii2-actions/actions/phpunit@master
         with:
           configuration: ${{ inputs.phpunit-configuration }}
           coverage-driver: ${{ inputs.coverage-driver }}
