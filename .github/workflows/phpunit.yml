@@ -145,9 +145,6 @@ jobs:
         php-version: ${{ fromJson(inputs.php-version) }}
 
     steps:
-      - name: Monitor action permissions.
-        if: runner.os != 'Windows'
-        uses: GitHubSecurityLab/actions-permissions/monitor@bf82d13b9b10051d224345ab9184f5ede0a94289
 
       - name: Checkout.
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
