@@ -21,12 +21,4 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze
-    permissions:
-      contents: read
-    uses: ./.github/workflows/zizmor.yml
-    with:
-      advanced-security: false
-      annotations: true
-      audit-inputs: .github actions
-      persona: pedantic
+    uses: yiisoft/actions/.github/workflows/zizmor.yml@master
