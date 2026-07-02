@@ -159,7 +159,7 @@ jobs:
 
       - name: Cache PHPStan results.
         if: ${{ inputs.phpstan }}
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .phpstan/cache
           key: phpstan-${{ runner.os }}-${{ hashFiles('phpstan.neon*') }}
