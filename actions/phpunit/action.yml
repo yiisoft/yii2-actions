@@ -61,68 +61,100 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Build PHPUnit command.
-      id: build-cmd
+    - name: Run PHPUnit tests on Linux.
       shell: bash
+      if: runner.os != 'Windows'
+      env:
+        ADDITIONAL_ARGS: ${{ inputs.additional-args }}
+        CONFIGURATION: ${{ inputs.configuration }}
+        COVERAGE_DRIVER: ${{ inputs.coverage-driver }}
+        COVERAGE_FILE: ${{ inputs.coverage-file }}
+        COVERAGE_FORMAT: ${{ inputs.coverage-format }}
+        DEBUG: ${{ inputs.debug }}
+        EXCLUDE_GROUP: ${{ inputs.exclude-group }}
+        GROUP: ${{ inputs.group }}
+        PHPUNIT_PATH: ${{ inputs.path }}
+        TEST_SUITE: ${{ inputs.test-suite }}
       run: |
-        PATH_INPUT="${{ inputs.path }}"
-        CONFIG_INPUT="${{ inputs.configuration }}"
-        SUITE_INPUT="${{ inputs.test-suite }}"
-        GROUP_INPUT="${{ inputs.group }}"
-        EXCLUDE_GROUP_INPUT="${{ inputs.exclude-group }}"
-        DEBUG_INPUT="${{ inputs.debug }}"
-        ADDITIONAL_ARGS="${{ inputs.additional-args }}"
-        COVERAGE_DRIVER="${{ inputs.coverage-driver }}"
-        COVERAGE_FORMAT="${{ inputs.coverage-format }}"
-        COVERAGE_FILE="${{ inputs.coverage-file }}"
-
-        PHPUNIT_CMD="$PATH_INPUT --colors=always"
+        args=(--colors=always)
 
         add_param() {
           if [ -n "$2" ]; then
-            PHPUNIT_CMD="$PHPUNIT_CMD $1 $2"
+            args+=("$1" "$2")
           fi
         }
 
         if [ -n "$COVERAGE_DRIVER" ] && [ "$COVERAGE_DRIVER" != "none" ]; then
-          PHPUNIT_CMD="$PHPUNIT_CMD --coverage-$COVERAGE_FORMAT=$COVERAGE_FILE"
+          args+=("--coverage-$COVERAGE_FORMAT=$COVERAGE_FILE")
         fi
 
-        add_param "--configuration" "$CONFIG_INPUT"
-        add_param "--testsuite" "$SUITE_INPUT"
-        add_param "--group" "$GROUP_INPUT"
-        add_param "--exclude-group" "$EXCLUDE_GROUP_INPUT"
+        add_param "--configuration" "$CONFIGURATION"
+        add_param "--testsuite" "$TEST_SUITE"
+        add_param "--group" "$GROUP"
+        add_param "--exclude-group" "$EXCLUDE_GROUP"
 
-        if [ -n "$DEBUG_INPUT" ]; then
-          PHPUNIT_CMD="$PHPUNIT_CMD $DEBUG_INPUT"
+        if [ -n "$DEBUG" ]; then
+          args+=("$DEBUG")
         fi
 
         if [ -n "$ADDITIONAL_ARGS" ]; then
-          PHPUNIT_CMD="$PHPUNIT_CMD $ADDITIONAL_ARGS"
+          read -r -a extra_args <<< "$ADDITIONAL_ARGS"
+          args+=("${extra_args[@]}")
         fi
 
-        echo "command=$PHPUNIT_CMD" >> $GITHUB_OUTPUT
-        echo "PHPUnit command: $PHPUNIT_CMD"
-
-    - name: Run PHPUnit tests on Linux.
-      shell: bash
-      if: runner.os != 'Windows'
-      run: ${{ steps.build-cmd.outputs.command }}
+        "$PHPUNIT_PATH" "${args[@]}"
 
     - name: Run PHPUnit tests on Windows.
       shell: pwsh
       if: runner.os == 'Windows'
-      run: Invoke-Expression "${{ steps.build-cmd.outputs.command }}"
+      env:
+        ADDITIONAL_ARGS: ${{ inputs.additional-args }}
+        CONFIGURATION: ${{ inputs.configuration }}
+        COVERAGE_DRIVER: ${{ inputs.coverage-driver }}
+        COVERAGE_FILE: ${{ inputs.coverage-file }}
+        COVERAGE_FORMAT: ${{ inputs.coverage-format }}
+        DEBUG: ${{ inputs.debug }}
+        EXCLUDE_GROUP: ${{ inputs.exclude-group }}
+        GROUP: ${{ inputs.group }}
+        PHPUNIT_PATH: ${{ inputs.path }}
+        TEST_SUITE: ${{ inputs.test-suite }}
+      run: |
+        $arguments = @('--colors=always')
+
+        function Add-Param($name, $value) {
+          if ($value -ne '') {
+            $script:arguments += @($name, $value)
+          }
+        }
+
+        if ($env:COVERAGE_DRIVER -ne '' -and $env:COVERAGE_DRIVER -ne 'none') {
+          $arguments += "--coverage-$env:COVERAGE_FORMAT=$env:COVERAGE_FILE"
+        }
+
+        Add-Param '--configuration' $env:CONFIGURATION
+        Add-Param '--testsuite' $env:TEST_SUITE
+        Add-Param '--group' $env:GROUP
+        Add-Param '--exclude-group' $env:EXCLUDE_GROUP
+
+        if ($env:DEBUG -ne '') {
+          $arguments += $env:DEBUG
+        }
+
+        if ($env:ADDITIONAL_ARGS -ne '') {
+          $arguments += $env:ADDITIONAL_ARGS -split ' '
+        }
+
+        & $env:PHPUNIT_PATH @arguments
 
     - name: Upload test results to Codecov.
       if: ${{ !cancelled() && inputs.coverage-driver != 'none' }}
-      uses: codecov/test-results-action@v1
+      uses: codecov/test-results-action@47f89e9acb64b76debcd5ea40642d25a4adced9f # v1.1.1
       with:
         token: ${{ inputs.coverage-token }}
 
     - name: Upload coverage to Codecov.
       if: ${{ !cancelled() && inputs.coverage-driver != 'none' }}
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f # v5.5.1
       with:
         token: ${{ inputs.coverage-token }}
         files: ./${{ inputs.coverage-file }}

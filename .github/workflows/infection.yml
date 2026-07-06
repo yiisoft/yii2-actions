@@ -1,3 +1,6 @@
+permissions:
+  contents: read
+
 name: infection
 
 on:
@@ -132,12 +135,11 @@ jobs:
         php-version: ${{ fromJson(inputs.php-version) }}
 
     steps:
-      - name: Monitor action permissions.
-        if: runner.os != 'Windows'
-        uses: GitHubSecurityLab/actions-permissions/monitor@v1
 
       - name: Checkout.
-        uses: actions/checkout@v7
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
 
       - name: Setup PHP Environment.
         uses: yiisoft/yii2-actions/actions/php-setup@master
@@ -155,11 +157,13 @@ jobs:
 
       - name: Run before hook.
         if: inputs.before-hook != ''
-        run: ${{ inputs.before-hook }}
+        run: ${INPUTS_BEFORE_HOOK}
+        env:
+          INPUTS_BEFORE_HOOK: ${{ inputs.before-hook }}
 
       - name: Cache PHPStan results.
         if: ${{ inputs.phpstan }}
-        uses: actions/cache@v6
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: .phpstan/cache
           key: phpstan-${{ runner.os }}-${{ hashFiles('phpstan.neon*') }}
@@ -171,27 +175,33 @@ jobs:
         shell: bash
         run: >-
           vendor/bin/phpstan
-          --configuration="${{ inputs.phpstan-configuration }}"
+          --configuration="${INPUTS_PHPSTAN_CONFIGURATION}"
           analyse
+        env:
+          INPUTS_PHPSTAN_CONFIGURATION: ${{ inputs.phpstan-configuration }}
 
       - name: Run infection.
         shell: bash
         run: >-
-          vendor/bin/${{ inputs.command }}
-          ${{ inputs.command-options }}
+          vendor/bin/${INPUTS_COMMAND}
+          ${INPUTS_COMMAND_OPTIONS}
           ${{ inputs.phpstan && '--static-analysis-tool=phpstan' || '' }}
-          ${{ inputs.command-coverage-options }}
-          ${{ inputs.framework-options }}
+          ${INPUTS_COMMAND_COVERAGE_OPTIONS}
+          ${INPUTS_FRAMEWORK_OPTIONS}
         env:
           STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}
+          INPUTS_COMMAND: ${{ inputs.command }}
+          INPUTS_COMMAND_OPTIONS: ${{ inputs.command-options }}
+          INPUTS_COMMAND_COVERAGE_OPTIONS: ${{ inputs.command-coverage-options }}
+          INPUTS_FRAMEWORK_OPTIONS: ${{ inputs.framework-options }}
 
       - name: Archive infection results.
         if: ${{ inputs.debug }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: infection-${{ matrix.php-version }}-${{ matrix.os }}
           path: ./infection.log
 
       - name: Download all workflow run artifacts.
         if: ${{ inputs.debug }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c

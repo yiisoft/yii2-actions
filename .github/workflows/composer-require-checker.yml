@@ -1,3 +1,6 @@
+permissions:
+  contents: read
+
 name: composer-require-checker
 
 on:
@@ -77,6 +80,9 @@ on:
 jobs:
   composer-require-checker:
     name: PHP ${{ matrix.php-version }}-${{ matrix.os }}
+    permissions:
+      contents: read
+      pull-requests: write
 
     concurrency:
       group: ${{ matrix.os }}-${{ matrix.php-version }}-${{ inputs.concurrency-group }}
@@ -91,12 +97,11 @@ jobs:
         php-version: ${{ fromJson(inputs.php-version) }}
 
     steps:
-      - name: Monitor action permissions.
-        if: runner.os != 'Windows'
-        uses: GitHubSecurityLab/actions-permissions/monitor@v1
 
       - name: Checkout.
-        uses: actions/checkout@v7
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
 
       - name: Setup PHP Environment.
         uses: yiisoft/yii2-actions/actions/php-setup@master
@@ -113,4 +118,6 @@ jobs:
           tools: ${{ inputs.tools }}
 
       - name: Check composer requirements.
-        run: vendor/bin/composer-require-checker ${{ inputs.command-options }}
+        run: vendor/bin/composer-require-checker ${INPUTS_COMMAND_OPTIONS}
+        env:
+          INPUTS_COMMAND_OPTIONS: ${{ inputs.command-options }}

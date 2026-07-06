@@ -62,10 +62,10 @@ runs:
   using: composite
   steps:
     - name: Checkout
-      uses: actions/checkout@v5
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
     - name: Install PHP
-      uses: shivammathur/setup-php@v2
+      uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
       with:
         coverage: ${{ inputs.coverage-driver }}
         extensions: ${{ inputs.extensions }}
@@ -75,14 +75,23 @@ runs:
 
     - name: Update composer.
       shell: bash
-      run: composer self-update ${{ inputs.composer-version }}
+      env:
+        COMPOSER_VERSION: ${{ inputs.composer-version }}
+      run: |
+        if [ "$COMPOSER_VERSION" != '' ]; then
+          composer self-update "$COMPOSER_VERSION"
+        else
+          composer self-update
+        fi
 
     - name: Configure composer on linux.
       shell: bash
       if: runner.os == 'Linux'
+      env:
+        AUTH_TOKEN: ${{ inputs.auth-token }}
       run: |
-        if [ "${{ inputs.auth-token }}" != '' ]; then
-          composer config -g github-oauth.github.com ${{ inputs.auth-token }};
+        if [ "$AUTH_TOKEN" != '' ]; then
+          composer config -g github-oauth.github.com "$AUTH_TOKEN";
         fi
 
     - name: Configure composer on windows.
@@ -97,12 +106,16 @@ runs:
 
     - name: Install dependencies with composer.
       shell: bash
-      run: >-
-        composer
-        ${{ inputs.composer-command }}
-        ${{ inputs.composer-flags }}
-        ${{
-          inputs.ignore-platform-reqs == 'true'
-          && '--ignore-platform-reqs'
-          || ''
-        }}
+      env:
+        COMPOSER_COMMAND: ${{ inputs.composer-command }}
+        COMPOSER_FLAGS: ${{ inputs.composer-flags }}
+        IGNORE_PLATFORM_REQS: ${{ inputs.ignore-platform-reqs }}
+      run: |
+        read -r -a composer_flags <<< "$COMPOSER_FLAGS"
+        command=(composer "$COMPOSER_COMMAND" "${composer_flags[@]}")
+
+        if [ "$IGNORE_PLATFORM_REQS" = 'true' ]; then
+          command+=(--ignore-platform-reqs)
+        fi
+
+        "${command[@]}"
