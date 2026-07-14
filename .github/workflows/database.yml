@@ -166,7 +166,6 @@ jobs:
     name: PHP ${{ matrix.php-version }}-${{ inputs.database-type }}-${{ matrix.database-version }}
     permissions:
       contents: read
-      pull-requests: write
 
     concurrency:
       group: ${{ matrix.os }}-${{ matrix.php-version }}-${{ inputs.database-type }}-${{ matrix.database-version }}-${{ inputs.concurrency-group }}

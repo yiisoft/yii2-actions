@@ -92,7 +92,6 @@ jobs:
     name: PHP ${{ matrix.php-version }}-${{ matrix.os }}
     permissions:
       contents: read
-      pull-requests: write
 
     concurrency:
       group: ${{ matrix.os }}-${{ matrix.php-version }}-${{ inputs.concurrency-group }}
