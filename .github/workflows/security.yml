@@ -1,0 +1,19 @@
+name: GitHub Actions Security Analysis with zizmor 🌈
+
+on:
+  pull_request: &ignore-paths
+    paths:
+      - '.github/**.yml'
+      - '.github/**.yaml'
+      - 'actions/**.yml'
+      - 'actions/**.yaml'
+  
+  push: *ignore-paths
+
+permissions:
+  actions: read # Required by zizmor when reading workflow metadata through the API.
+  contents: read # Required to read workflow files.
+
+jobs:
+  zizmor:
+    uses: yiisoft/yii2-actions/.github/workflows/zizmor.yml@master
