@@ -166,7 +166,6 @@ jobs:
     name: PHP ${{ matrix.php-version }}-${{ inputs.database-type }}-${{ matrix.database-version }}
     permissions:
       contents: read
-      pull-requests: write
 
     concurrency:
       group: ${{ matrix.os }}-${{ matrix.php-version }}-${{ inputs.database-type }}-${{ matrix.database-version }}-${{ inputs.concurrency-group }}
@@ -203,10 +202,10 @@ jobs:
 
       - name: Run hook.
         if: inputs.hook != ''
-        run: ${INPUTS_HOOK}
+        run: bash -euo pipefail -c "$HOOK"        
         shell: bash
         env:
-          INPUTS_HOOK: ${{ inputs.hook }}
+          HOOK: ${{ inputs.hook }}
 
       - name: Setup PHP Environment.
         uses: yiisoft/yii2-actions/actions/php-setup@master
