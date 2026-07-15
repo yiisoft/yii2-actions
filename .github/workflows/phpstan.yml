@@ -8,7 +8,7 @@ on:
     inputs:
       command-options:
         description: Options for the PHPStan tool.
-        default: "analyse --error-format=checkstyle | cs2pr"
+        default: "analyse --error-format=github"
         required: false
         type: string
       composer-command:
@@ -92,7 +92,6 @@ jobs:
     name: PHP ${{ matrix.php-version }}-${{ matrix.os }}
     permissions:
       contents: read
-      pull-requests: write      
 
     concurrency:
       group: ${{ matrix.os }}-${{ matrix.php-version }}-${{ inputs.concurrency-group }}
