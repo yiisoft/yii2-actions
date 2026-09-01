@@ -41,6 +41,11 @@ on:
           --ansi
         required: false
         type: string
+      composer-root-version:
+        description: Root package version to use (COMPOSER_ROOT_VERSION).
+        default:
+        required: false
+        type: string
       composer-version:
         description: Composer version to use.
         default:
@@ -147,6 +152,7 @@ jobs:
           auth-token: ${{ secrets.AUTH_TOKEN }}
           composer-command: ${{ inputs.composer-command }}
           composer-flags: ${{ inputs.composer-flags }}
+          composer-root-version: ${{ inputs.composer-root-version }}
           composer-version: ${{ inputs.composer-version }}
           coverage-driver: ${{ inputs.coverage-driver }}
           extensions: ${{ inputs.extensions }}

@@ -22,6 +22,11 @@ inputs:
       --ansi
     required: false
     type: string
+  composer-root-version:
+    description: Root package version to use (COMPOSER_ROOT_VERSION).
+    default:
+    required: false
+    type: string
   composer-version:
     description: Composer version to use.
     default:
@@ -109,6 +114,7 @@ runs:
       env:
         COMPOSER_COMMAND: ${{ inputs.composer-command }}
         COMPOSER_FLAGS: ${{ inputs.composer-flags }}
+        COMPOSER_ROOT_VERSION: ${{ inputs.composer-root-version }}
         IGNORE_PLATFORM_REQS: ${{ inputs.ignore-platform-reqs }}
       run: |
         read -r -a composer_flags <<< "$COMPOSER_FLAGS"
