@@ -1,0 +1,149 @@
+permissions:
+  contents: read
+
+name: rector
+
+on:
+  workflow_call:
+    inputs:
+      command-options:
+        description: Options for the Rector tool.
+        default: "--dry-run --ansi"
+        required: false
+        type: string
+      composer-command:
+        description: Composer command (install or update) to run.
+        default: update
+        required: false
+        type: string
+      composer-flags:
+        description: Additional composer flags
+        default: >-
+          --prefer-dist
+          --no-interaction
+          --no-progress
+          --optimize-autoloader
+          --ansi
+        required: false
+        type: string
+      composer-root-version:
+        description: Root package version to use (COMPOSER_ROOT_VERSION).
+        default:
+        required: false
+        type: string
+      composer-version:
+        description: Composer version to use.
+        default:
+        required: false
+        type: string
+      concurrency-group:
+        description: Concurrency group name.
+        default: ${{ github.workflow }}-${{ github.ref }}
+        required: false
+        type: string
+      configuration:
+        description: Rector configuration file.
+        default: rector.php
+        required: false
+        type: string
+      enable-concurrency:
+        description: Enable concurrency.
+        default: true
+        required: false
+        type: boolean
+      extensions:
+        description: List of extensions to PHP.
+        default:
+        required: false
+        type: string
+      hook:
+        description: Command to run before Rector analysis.
+        default: ""
+        required: false
+        type: string
+      ignore-platform-reqs:
+        description: Whether to add --ignore-platform-reqs to composer command.
+        default: false
+        required: false
+        type: boolean
+      os:
+        description: OS runner as a JSON array string '["ubuntu-latest"]'.
+        default: '["ubuntu-latest"]'
+        required: false
+        type: string
+      php-ini-values:
+        description: Initial values for PHP configuration.
+        default: date.timezone='UTC'
+        required: false
+        type: string
+      php-version:
+        description: PHP versions as a JSON array string '["8.5"]'.
+        default: '["8.5"]'
+        required: false
+        type: string
+      tools:
+        description: Tools to test, separated by comma.
+        default:
+        required: false
+        type: string
+
+    secrets:
+      AUTH_TOKEN:
+        description: GitHub token.
+        required: false
+
+jobs:
+  rector:
+    name: PHP ${{ matrix.php-version }}-${{ matrix.os }}
+    permissions:
+      contents: read
+
+    concurrency:
+      group: ${{ matrix.os }}-${{ matrix.php-version }}-${{ inputs.concurrency-group }}
+      cancel-in-progress: ${{ inputs.enable-concurrency }}
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(inputs.os) }}
+        php-version: ${{ fromJson(inputs.php-version) }}
+
+    steps:
+
+      - name: Checkout.
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP Environment.
+        uses: yiisoft/yii2-actions/actions/php-setup@master
+        with:
+          auth-token: ${{ secrets.AUTH_TOKEN }}
+          composer-command: ${{ inputs.composer-command }}
+          composer-flags: ${{ inputs.composer-flags }}
+          composer-root-version: ${{ inputs.composer-root-version }}
+          composer-version: ${{ inputs.composer-version }}
+          coverage-driver: none
+          extensions: ${{ inputs.extensions }}
+          ignore-platform-reqs: ${{ inputs.ignore-platform-reqs }}
+          ini-values: ${{ inputs.php-ini-values }}
+          php-version: ${{ matrix.php-version }}
+          tools: ${{ inputs.tools }}
+
+      - name: Pre-setup hook.
+        if: inputs.hook != ''
+        shell: bash
+        run: ${INPUTS_HOOK}
+        env:
+          INPUTS_HOOK: ${{ inputs.hook }}
+
+      - name: Run Rector.
+        run: >-
+          vendor/bin/rector process
+          --config=${INPUTS_CONFIGURATION}
+          ${INPUTS_COMMAND_OPTIONS}
+        env:
+          INPUTS_CONFIGURATION: ${{ inputs.configuration }}
+          INPUTS_COMMAND_OPTIONS: ${{ inputs.command-options }}
