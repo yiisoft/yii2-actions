@@ -8,7 +8,7 @@ on:
     inputs:
       command-options:
         description: Options for the PHP CS Fixer tool.
-        default: "fix --dry-run --diff --ansi"
+        default: "check --diff --ansi"
         required: false
         type: string
       composer-command:
