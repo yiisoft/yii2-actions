@@ -14,7 +14,7 @@ inputs:
     type: string
   coverage-driver:
     description: Code coverage driver to use (pcov, xdebug, none).
-    default: ""
+    default: none
     required: false
     type: string
   coverage-file:
@@ -38,12 +38,12 @@ inputs:
     required: false
     type: string
   exclude-group:
-    description: Exclude group from phpunit.
+    description: Groups to exclude, separated by commas or spaces.
     default: ""
     required: false
     type: string
   group:
-    description: Include specific group in phpunit.
+    description: Groups to include, separated by commas or spaces.
     default: ""
     required: false
     type: string
@@ -84,23 +84,57 @@ runs:
           fi
         }
 
+        # PHPUnit < 11 keeps only the last repeated --group/--exclude-group, PHPUnit 12 rejects comma-separated lists.
+        phpunit_major=0
+
+        if [ -n "$GROUP" ] || [ -n "$EXCLUDE_GROUP" ]; then
+          if [[ "$("$PHPUNIT_PATH" --version 2>/dev/null)" =~ PHPUnit\ ([0-9]+)\. ]]; then
+            phpunit_major="${BASH_REMATCH[1]}"
+          else
+            echo "::warning::Unable to detect the PHPUnit version; passing groups as a comma-separated list."
+          fi
+        fi
+
+        add_groups() {
+          local groups=()
+
+          read -r -a groups <<< "${2//,/ }"
+
+          if [ "${#groups[@]}" -eq 0 ]; then
+            return
+          fi
+
+          if [ "$phpunit_major" -ge 11 ]; then
+            for group in "${groups[@]}"; do
+              args+=("$1" "$group")
+            done
+          else
+            args+=("$1" "$(IFS=,; echo "${groups[*]}")")
+          fi
+        }
+
         if [ -n "$COVERAGE_DRIVER" ] && [ "$COVERAGE_DRIVER" != "none" ]; then
           args+=("--coverage-$COVERAGE_FORMAT=$COVERAGE_FILE")
         fi
 
         add_param "--configuration" "$CONFIGURATION"
         add_param "--testsuite" "$TEST_SUITE"
-        add_param "--group" "$GROUP"
-        add_param "--exclude-group" "$EXCLUDE_GROUP"
+        add_groups "--group" "$GROUP"
+        add_groups "--exclude-group" "$EXCLUDE_GROUP"
 
         if [ -n "$DEBUG" ]; then
-          args+=("$DEBUG")
+          read -r -a debug_args <<< "$DEBUG"
+          args+=("${debug_args[@]}")
         fi
 
         if [ -n "$ADDITIONAL_ARGS" ]; then
           read -r -a extra_args <<< "$ADDITIONAL_ARGS"
           args+=("${extra_args[@]}")
         fi
+
+        printf 'PHPUnit command:'
+        printf ' %q' "$PHPUNIT_PATH" "${args[@]}"
+        printf '\n'
 
         "$PHPUNIT_PATH" "${args[@]}"
 
@@ -121,28 +155,59 @@ runs:
       run: |
         $arguments = @('--colors=always')
 
-        function Add-Param($name, $value) {
-          if ($value -ne '') {
+        function Add-Param([string] $name, [string] $value) {
+          if ($value) {
             $script:arguments += @($name, $value)
           }
         }
 
-        if ($env:COVERAGE_DRIVER -ne '' -and $env:COVERAGE_DRIVER -ne 'none') {
-          $arguments += "--coverage-$env:COVERAGE_FORMAT=$env:COVERAGE_FILE"
+        # PHPUnit < 11 keeps only the last repeated --group/--exclude-group, PHPUnit 12 rejects comma-separated lists.
+        $phpunitMajor = 0
+
+        if ($env:GROUP -or $env:EXCLUDE_GROUP) {
+          $version = & $env:PHPUNIT_PATH --version 2>$null | Out-String
+
+          if ($version -match 'PHPUnit (\d+)\.') {
+            $phpunitMajor = [int] $Matches[1]
+          } else {
+            Write-Host '::warning::Unable to detect the PHPUnit version; passing groups as a comma-separated list.'
+          }
+        }
+
+        function Add-Groups([string] $name, [string] $value) {
+          $groups = @($value -split '[\s,]+' | Where-Object { $_ })
+
+          if ($groups.Count -eq 0) {
+            return
+          }
+
+          if ($script:phpunitMajor -ge 11) {
+            foreach ($group in $groups) {
+              $script:arguments += @($name, $group)
+            }
+          } else {
+            $script:arguments += @($name, ($groups -join ','))
+          }
+        }
+
+        if ($env:COVERAGE_DRIVER -and $env:COVERAGE_DRIVER -ne 'none') {
+          $arguments += "--coverage-$($env:COVERAGE_FORMAT)=$($env:COVERAGE_FILE)"
         }
 
         Add-Param '--configuration' $env:CONFIGURATION
         Add-Param '--testsuite' $env:TEST_SUITE
-        Add-Param '--group' $env:GROUP
-        Add-Param '--exclude-group' $env:EXCLUDE_GROUP
+        Add-Groups '--group' $env:GROUP
+        Add-Groups '--exclude-group' $env:EXCLUDE_GROUP
 
-        if ($env:DEBUG -ne '') {
-          $arguments += $env:DEBUG
+        if ($env:DEBUG) {
+          $arguments += $env:DEBUG -split ' '
         }
 
-        if ($env:ADDITIONAL_ARGS -ne '') {
+        if ($env:ADDITIONAL_ARGS) {
           $arguments += $env:ADDITIONAL_ARGS -split ' '
         }
+
+        Write-Host "PHPUnit command: $env:PHPUNIT_PATH $($arguments -join ' ')"
 
         & $env:PHPUNIT_PATH @arguments
 
