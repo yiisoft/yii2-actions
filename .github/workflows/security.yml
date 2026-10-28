@@ -16,4 +16,4 @@ permissions:
 
 jobs:
   zizmor:
-    uses: yiisoft/yii2-actions/.github/workflows/zizmor.yml@master
+    uses: $/.github/workflows/zizmor.yml
