@@ -17,4 +17,6 @@ jobs:
       contents: read # Required to check out the repository.
       id-token: write # Required to sign published results with the GitHub OIDC token.
       security-events: write # Required to upload SARIF results to code scanning.
-    uses: yiisoft/yii2-actions/.github/workflows/scorecard.yml@master
+    uses: $/.github/workflows/scorecard.yml
+    secrets:
+      SCORECARD_TOKEN: ${{ secrets.SCORECARD_TOKEN }}
