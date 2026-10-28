@@ -1,0 +1,115 @@
+permissions:
+  contents: read
+
+name: scorecard
+
+on:
+  workflow_call:
+    inputs:
+      artifact-name:
+        description: Name of the uploaded results artifact.
+        default: scorecard-results
+        required: false
+        type: string
+      artifact-retention-days:
+        description: Retention period in days for the uploaded results artifact.
+        default: 5
+        required: false
+        type: number
+      checkout-fetch-depth:
+        description: Fetch depth for checkout action.
+        default: 1
+        required: false
+        type: number
+      concurrency-group:
+        description: Concurrency group name.
+        default: ${{ github.workflow }}-${{ github.ref }}
+        required: false
+        type: string
+      enable-concurrency:
+        description: Enable concurrency.
+        default: true
+        required: false
+        type: boolean
+      file-mode:
+        description: Method used by Scorecard to fetch repository files (`git` or `archive`). `git` also analyzes paths excluded from archives with `export-ignore`.
+        default: git
+        required: false
+        type: string
+      publish-results:
+        description: Publish results to the OpenSSF Scorecard API to enable the badge and the public viewer (public repositories, default branch only).
+        default: true
+        required: false
+        type: boolean
+      results-file:
+        description: Path of the results file.
+        default: results.sarif
+        required: false
+        type: string
+      results-format:
+        description: Results format (`sarif`, `json` or `intoto`).
+        default: sarif
+        required: false
+        type: string
+      upload-artifact:
+        description: Upload the results file as a workflow artifact.
+        default: true
+        required: false
+        type: boolean
+      upload-sarif:
+        description: Upload SARIF results to GitHub code scanning. Set to `false` for private repositories without GitHub Code Security.
+        default: true
+        required: false
+        type: boolean
+
+    secrets:
+      SCORECARD_TOKEN:
+        description: GitHub token with read access used instead of the default token, required by the Branch-Protection check.
+        required: false
+
+# The OpenSSF Scorecard API verifies this workflow before accepting published results, see
+# https://github.com/ossf/scorecard-action#workflow-restrictions: a single literal Ubuntu runner,
+# no `env`, `defaults`, `container` or `services`, and only allowlisted `uses` steps.
+jobs:
+  scorecard:
+    name: Scorecard
+    permissions:
+      contents: read # Required to check out the repository.
+      id-token: write # Required to sign published results with the GitHub OIDC token.
+      security-events: write # Required to upload SARIF results to code scanning.
+
+    concurrency:
+      group: ${{ inputs.enable-concurrency && format('scorecard-{0}', inputs.concurrency-group) || format('scorecard-{0}-{1}', inputs.concurrency-group, github.run_id) }}
+      cancel-in-progress: ${{ inputs.enable-concurrency }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: ${{ inputs.checkout-fetch-depth }}
+          persist-credentials: false
+
+      - name: Run OpenSSF Scorecard.
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          file_mode: ${{ inputs.file-mode }}
+          publish_results: ${{ inputs.publish-results }}
+          repo_token: ${{ secrets.SCORECARD_TOKEN || github.token }}
+          results_file: ${{ inputs.results-file }}
+          results_format: ${{ inputs.results-format }}
+
+      - name: Upload results artifact.
+        if: ${{ inputs.upload-artifact }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.results-file }}
+          retention-days: ${{ inputs.artifact-retention-days }}
+
+      - name: Upload results to code scanning.
+        if: ${{ inputs.upload-sarif && inputs.results-format == 'sarif' }}
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: ${{ inputs.results-file }}
