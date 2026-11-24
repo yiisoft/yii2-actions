@@ -47,6 +47,11 @@ inputs:
     default: false
     required: false
     type: boolean
+  ignore-platform-reqs-php-version:
+    description: PHP versions as a JSON array string '["8.5"]' to add --ignore-platform-reqs to composer command.
+    default: '[]'
+    required: false
+    type: string
   ini-values:
     description: Initial values for PHP configuration.
     default: date.timezone='UTC'
@@ -112,7 +117,13 @@ runs:
         COMPOSER_COMMAND: ${{ inputs.composer-command }}
         COMPOSER_FLAGS: ${{ inputs.composer-flags }}
         COMPOSER_ROOT_VERSION: ${{ inputs.composer-root-version }}
-        IGNORE_PLATFORM_REQS: ${{ inputs.ignore-platform-reqs }}
+        # A numeric matrix value such as 8.0 reaches this action as "8", so its "X.0" form is matched too.
+        IGNORE_PLATFORM_REQS: >-
+          ${{
+            inputs.ignore-platform-reqs == 'true'
+            || contains(fromJson(inputs.ignore-platform-reqs-php-version), inputs.php-version)
+            || contains(fromJson(inputs.ignore-platform-reqs-php-version), format('{0}.0', inputs.php-version))
+          }}
       run: |
         read -r -a composer_flags <<< "$COMPOSER_FLAGS"
         command=(composer "$COMPOSER_COMMAND" "${composer_flags[@]}")
